@@ -43,13 +43,13 @@ class syntax_plugin_sqlquery extends DokuWiki_Syntax_Plugin {
             if (preg_match('/<sql\b.*host=([\w\-\.$]+)/', $match, $result)) {
                 $data['host'] = $result[1];
             } else {
-                $data['host'] = $this->getConf('host');
+                $data['host'] = $this->getConf('Host');
             }
             # get database
             if (preg_match('/<sql\b.*db=([\w\-\.$]+)/', $match, $result)) {
                 $data['db'] = $result[1];
             } else {
-                $data['db'] = $this->getConf('db');
+                $data['db'] = $this->getConf('DB');
             }
             # get query
                 $data['match'] = $match;
