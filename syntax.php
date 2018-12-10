@@ -4,29 +4,26 @@
  *
  * @license GPL 2 http://www.gnu.org/licenses/gpl-2.0.html
  * @author  George Pirogov <i1557@yandex.ru>
+ * @author  Thomas Hooge <hooge@rowa-group.com>
+ *
  */
 
 // must be run within Dokuwiki
 if (!defined('DOKU_INC')) die();
 
+/**
+ * All DokuWiki plugins to extend the parser/rendering mechanism
+ * need to inherit from this class
+ */
 class syntax_plugin_sqlquery extends DokuWiki_Syntax_Plugin {
 
-    public function getType() {
-        return 'substition';
-    }
-
-    public function getSort() {
-        return 666;
-    }
+    public function getType() { return 'substition'; }
+    public function getSort() { return 666; }
+    public function getPType() { return 'block'; }
 
     public function connectTo($mode)
     {
-        $this->Lexer->addEntryPattern('<sql>', $mode, 'plugin_sqlquery');
-    }
-
-    public function postConnect()
-    {
-        $this->Lexer->addExitPattern('</sql>','plugin_sqlquery');
+        $this->Lexer->addSpecialPattern('<sql\b(?:\s+(?:host|db)=[\w\-\.$]+?)*\s*>(?:.*?</sql>)', $mode, 'plugin_sqlquery');
     }
 
     /**
@@ -36,29 +33,30 @@ class syntax_plugin_sqlquery extends DokuWiki_Syntax_Plugin {
      * @param int             $state   The state of the handler
      * @param int             $pos     The position in the document
      * @param Doku_Handler    $handler The handler
+     *
      * @return array Data for the renderer
      */
-    public function handle($match, $state, $pos, Doku_Handler $handler)
-    {
-        switch ( $state )
-        {
-              case DOKU_LEXER_ENTER:
-              $data = array();
-              return $data;
-              break;
-
-              case DOKU_LEXER_UNMATCHED:
-        			return array('sqlquery' => $match);
-              break;
-
-              case DOKU_LEXER_EXIT:
-              $data = array();
-              return $data;
-              break;
-
+    public function handle($match, $state, $pos, Doku_Handler $handler) {
+        $data = array('state' => $state);
+        if ($state == DOKU_LEXER_SPECIAL) {
+            # get host
+            if (preg_match('/<sql\b.*host=([\w\-\.$]+)/', $match, $result)) {
+                $data['host'] = $result[1];
+            } else {
+                $data['host'] = $this->getConf('host');
+            }
+            # get database
+            if (preg_match('/<sql\b.*db=([\w\-\.$]+)/', $match, $result)) {
+                $data['db'] = $result[1];
+            } else {
+                $data['db'] = $this->getConf('db');
+            }
+            # get query
+                $data['match'] = $match;
+            if (preg_match('%<sql.*?>(.*)</sql>%s', $match, $result)) {
+                $data['query'] = trim($result[1]);
+            }
         }
-
-        $data = array();
         return $data;
     }
 
@@ -68,72 +66,67 @@ class syntax_plugin_sqlquery extends DokuWiki_Syntax_Plugin {
      * @param string         $mode      Renderer mode (supported modes: xhtml)
      * @param Doku_Renderer  $renderer  The renderer
      * @param array          $data      The data from the handler() function
+     *
      * @return bool If rendering was successful.
      */
     public function render($mode, Doku_Renderer $renderer, $data)
     {
-        if ( $mode != 'xhtml' ) return false;
+        if ($mode != 'xhtml') return false;
+        if (empty($data['query'])) return true;
 
-        if ( !empty( $data['sqlquery'] ) )
-        {
-            // получаем параметры конфигурации
-            $host     = $this->getConf('Host');
-            $DB       = $this->getConf('DB');
-            $user     = $this->getConf('user');
-            $password = $this->getConf('password');
+        // get configuration
+        $user     = $this->getConf('user');
+        $password = $this->getConf('password');
 
-            // получаем запрос
-            $querystring = $data['sqlquery'];
+        // connect to database
+        $link = mysqli_connect($data['host'], $user, $password, $data['db']);
+        if (!$link) {
+            $renderer->doc .= "<pre>" . mysqli_connect_error() . "</pre>";
+            return true;
+        }
+        mysqli_set_charset($link, "utf8");
 
-            // подключаемся к базе
-            $link = mysqli_connect($host, $user, $password, $DB);
-            mysqli_set_charset($link, "utf8");
+        // run query
+        $result = mysqli_query($link, $data['query']);
+        if ($result) {
 
-            // подключились
-            if ( $link )
-            {
-                $result = mysqli_query($link, $querystring);
-                if ( $result )
-                {
-                    // получаем кол-во полей в таблице
-                    $fieldcount = mysqli_num_fields($result);
+            // get the number of fields in the table
+            $fieldcount = mysqli_num_fields($result);
 
-                    // строим таблицу
-                    $renderer->doc .= "<table id=\"sqlquerytable\" class=\"inline\">";
+            // build a table
+            $renderer->doc .= '<table id="sqlquerytable" class="inline">' . "\n";
 
-                    // строим заголовок
-                    $renderer->doc .= "<thead><tr>";
-                    while ($fieldinfo = mysqli_fetch_field($result))
-                    {
-                        $renderer->doc .= "<th>";
-                        $renderer->doc .= $fieldinfo->name;
-                        $renderer->doc .= "</th>";
-                    }
-                    $renderer->doc .= "</tr></thead>";
+            // build the header section of the table
+            $renderer->doc .= "<thead><tr>";
+            while ($fieldinfo = mysqli_fetch_field($result)) {
+                $renderer->doc .= "<th>";
+                $renderer->doc .= $fieldinfo->name;
+                $renderer->doc .= "</th>";
+            }
+            $renderer->doc .= "</tr></thead>\n";
 
-                    // строим содержимое таблицы
-                    $renderer->doc .= "<tbody>";
-                    while ($row = mysqli_fetch_row($result))
-                    {
-                          $renderer->doc .= "<tr>";
+            // build the contents of the table
+            $renderer->doc .= "<tbody>\n";
+            while ($row = mysqli_fetch_row($result)) {
+                  $renderer->doc .= "<tr>";
+                  for ( $i = 0; $i < $fieldcount; $i++ ) {
+                      $renderer->doc .= "<td>";
+                      $renderer->doc .= $row[$i];
+                      $renderer->doc .= "</td>";
+                  }
+                  $renderer->doc .= "</tr>\n";
+            }
 
-                          // строим строку
-                          for ( $i = 0; $i < $fieldcount; $i++ )
-                          {
-                              $renderer->doc .= "<td>";
-                              $renderer->doc .= $row[$i];
-                              $renderer->doc .= "</td>";
-                          }
-                          $renderer->doc .= "</tr>";
-                    } // of while fetch_row
-                    // закрываем таблицу
-                    $renderer->doc .= "</tbody></table>";
-                } // of mysqli_query
-                mysqli_close($link);
-            } // of mysqli link
-        } // of sqlquery not empty
+            // finish the table
+            $renderer->doc .= "</tbody></table>\n";
+
+        } else {
+            // error in query
+            $renderer->doc .= "<pre>" . mysqli_error($link) . "</pre>";
+        }
+
+        mysqli_close($link);
+
         return true;
-    } // of render function
+    }
 }
-
-// vim:ts=4:sw=4:et:
