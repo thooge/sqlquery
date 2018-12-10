@@ -1,8 +1,8 @@
 <?php
 /**
- * Russian language file for sqlquery plugin
+ * German language file for sqlquery plugin
  *
- * @author George Pirogov <i1557@yandex.ru>
+ * @author Thomas Hooge <thomas@hoogi.de>
  */
 
 // menu entry for admin plugins
