@@ -85,7 +85,7 @@ class syntax_plugin_sqlquery extends DokuWiki_Syntax_Plugin {
         $password = $this->getConf('password');
 
         // connect to database
-        $dsn = "{$data['type']}:host={$data['host']};dbname={$data[db]}";
+        $dsn = "{$data['type']}:host={$data['host']};dbname={$data[db]};charset=UTF-8;";
         try {
             $dbh = new PDO($dsn, $user, $password);
         } catch (PDOException $e) {
@@ -126,7 +126,7 @@ class syntax_plugin_sqlquery extends DokuWiki_Syntax_Plugin {
             $renderer->doc .= "<tr>";
             for ( $i = 0; $i < $fieldcount; $i++ ) {
                 $renderer->doc .= "<td>";
-                $renderer->doc .= $row[$i];
+                $renderer->doc .= htmlentities($row[$i]);
                 $renderer->doc .= "</td>";
             }
             $renderer->doc .= "</tr>\n";
