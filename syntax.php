@@ -23,7 +23,7 @@ class syntax_plugin_sqlquery extends DokuWiki_Syntax_Plugin {
 
     public function connectTo($mode)
     {
-        $this->Lexer->addSpecialPattern('<sql\b(?:\s+(?:host|db)=[\w\-\.$]+?)*\s*>(?:.*?</sql>)', $mode, 'plugin_sqlquery');
+        $this->Lexer->addSpecialPattern('<sql\b(?:\s+(?:host|db|type)=[\w\-\.$]+?)*\s*>(?:.*?</sql>)', $mode, 'plugin_sqlquery');
     }
 
     /**
@@ -39,6 +39,12 @@ class syntax_plugin_sqlquery extends DokuWiki_Syntax_Plugin {
     public function handle($match, $state, $pos, Doku_Handler $handler) {
         $data = array('state' => $state);
         if ($state == DOKU_LEXER_SPECIAL) {
+            # get type (DSN prefix)
+            if (preg_match('/<sql\b.*type=(mysql|dblib)/', $match, $result)) {
+                $data['type'] = $result[1];
+            } else {
+                $data['type'] = $this->getConf('type');
+            }
             # get host
             if (preg_match('/<sql\b.*host=([\w\-\.$]+)/', $match, $result)) {
                 $data['host'] = $result[1];
@@ -79,7 +85,7 @@ class syntax_plugin_sqlquery extends DokuWiki_Syntax_Plugin {
         $password = $this->getConf('password');
 
         // connect to database
-        $dsn = "mysql:host={$data['host']};dbname={$data[db]}";
+        $dsn = "{$data['type']}:host={$data['host']};dbname={$data[db]}";
         try {
             $dbh = new PDO($dsn, $user, $password);
         } catch (PDOException $e) {

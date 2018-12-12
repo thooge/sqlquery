@@ -7,6 +7,7 @@
 
 //$conf['fixme']    = 'FIXME';
 
+$conf['type'] = 'mysql';
 $conf['Host'] = 'localhost';
 $conf['DB'] = '';
 $conf['user'] = '';

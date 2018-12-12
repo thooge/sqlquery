@@ -8,6 +8,7 @@
 // keys need to match the config setting name
 // $lang['fixme'] = 'FIXME';
 
+$lang['type'] = 'DSN prefix (database type)';
 $lang['Host'] = 'Default MySQL server address (DNS or IP)';
 $lang['DB'] = 'MySQL database name';
 $lang['user'] = 'Database username';

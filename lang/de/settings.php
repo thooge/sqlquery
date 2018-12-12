@@ -7,6 +7,7 @@
 
 // keys need to match the config setting name
 
+$lang['type'] = 'DSN-Prefix (Datenbanktyp)';
 $lang['Host'] = 'Standard MySQL-Serveradresse (DNS or IP)';
 $lang['DB'] = 'Standard MySQL-Datenbankname';
 $lang['user'] = 'Datenbankbenutzername';
