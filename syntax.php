@@ -79,53 +79,59 @@ class syntax_plugin_sqlquery extends DokuWiki_Syntax_Plugin {
         $password = $this->getConf('password');
 
         // connect to database
-        $link = mysqli_connect($data['host'], $user, $password, $data['db']);
-        if (!$link) {
-            $renderer->doc .= "<pre>" . mysqli_connect_error() . "</pre>";
+        $dsn = "mysql:host={$data['host']};dbname={$data[db]}";
+        try {
+            $dbh = new PDO($dsn, $user, $password);
+        } catch (PDOException $e) {
+            $renderer->doc .= "<pre>Unable to connect ro database:" . $e->getMessage() . "</pre>\n";
             return true;
         }
-        mysqli_set_charset($link, "utf8");
+        $dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $dbh->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_NUM);
 
         // run query
-        $result = mysqli_query($link, $data['query']);
-        if ($result) {
-
-            // get the number of fields in the table
-            $fieldcount = mysqli_num_fields($result);
-
-            // build a table
-            $renderer->doc .= '<table id="sqlquerytable" class="inline">' . "\n";
-
-            // build the header section of the table
-            $renderer->doc .= "<thead><tr>";
-            while ($fieldinfo = mysqli_fetch_field($result)) {
-                $renderer->doc .= "<th>";
-                $renderer->doc .= $fieldinfo->name;
-                $renderer->doc .= "</th>";
-            }
-            $renderer->doc .= "</tr></thead>\n";
-
-            // build the contents of the table
-            $renderer->doc .= "<tbody>\n";
-            while ($row = mysqli_fetch_row($result)) {
-                  $renderer->doc .= "<tr>";
-                  for ( $i = 0; $i < $fieldcount; $i++ ) {
-                      $renderer->doc .= "<td>";
-                      $renderer->doc .= $row[$i];
-                      $renderer->doc .= "</td>";
-                  }
-                  $renderer->doc .= "</tr>\n";
-            }
-
-            // finish the table
-            $renderer->doc .= "</tbody></table>\n";
-
-        } else {
-            // error in query
-            $renderer->doc .= "<pre>" . mysqli_error($link) . "</pre>";
+        try {
+            $result = $dbh->query($data['query']);
+        } catch (PDOException $e) {
+            $renderer->doc .= "<pre>Error in query:" . $e->getMessage() . "</pre>\n";
+            return true;
         }
 
-        mysqli_close($link);
+        // get the number of fields in the table
+        $fieldcount = $result->columnCount();
+
+        // build a table
+        $renderer->doc .= '<table id="sqlquerytable" class="inline">' . "\n";
+
+        // build the header section of the table
+        $renderer->doc .= "<thead><tr>";
+
+        for ($i = 0; $i < $fieldcount; $i++) {
+            $meta = $result->getColumnMeta($i);
+            $renderer->doc .= "<th>";
+            $renderer->doc .= $meta['name'];
+            $renderer->doc .= "</th>";
+        }
+        $renderer->doc .= "</tr></thead>\n";
+
+        // build the contents of the table
+        $renderer->doc .= "<tbody>\n";
+        foreach ($result as $row) {
+            $renderer->doc .= "<tr>";
+            for ( $i = 0; $i < $fieldcount; $i++ ) {
+                $renderer->doc .= "<td>";
+                $renderer->doc .= $row[$i];
+                $renderer->doc .= "</td>";
+            }
+            $renderer->doc .= "</tr>\n";
+        }
+
+        // finish the table
+        $renderer->doc .= "</tbody>\n</table>\n";
+
+        // Close connection, there is no close() method with PDO :-(
+        $result = null;
+        $dbh = null;
 
         return true;
     }
